@@ -15,22 +15,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # =========================
-      # 2. Install Sui CLI (Stable)
-      # =========================
       - name: Install Sui CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget file
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y wget file
 
-          wget -O sui https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64
+    # 🔥 VERSION FIX (AMAN)
+    wget -O sui https://github.com/MystenLabs/sui/releases/download/mainnet-v1.39.1/sui-ubuntu-x86_64
 
-          file sui
+    file sui
 
-          chmod +x sui
-          sudo mv sui /usr/local/bin/sui
+    chmod +x sui
+    sudo mv sui /usr/local/bin/sui
 
-          sui --version
+    sui --version
 
       # =========================
       # 3. Setup Wallet
