@@ -18,7 +18,7 @@ A Testnet NFT contract for the Suiduckz ecosystem on Sui Testnet.
 ## Contract Overview
 
 ### Main Structs
-- `DevnetBabySuiduckzNFT`
+- `TestnetBabySuiduckzNFT`
 - `Whitelist`
 - `Supply`
 - `AdminCap`
