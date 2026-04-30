@@ -2,82 +2,50 @@ name: Deploy Testnet Baby Suiduckz NFT
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # =========================
-      # 1. Checkout
-      # =========================
-      - name: Checkout
+      # 1. Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Install dependencies (Sui CLI)
       - name: Install Sui CLI
-  run: |
-    sudo apt-get update
-    sudo apt-get install -y wget file
-
-    # 🔥 VERSION FIX (AMAN)
-    wget -O sui https://github.com/MystenLabs/sui/releases/download/mainnet-v1.39.1/sui-ubuntu-x86_64
-
-    file sui
-
-    chmod +x sui
-    sudo mv sui /usr/local/bin/sui
-
-    sui --version
-
-      # =========================
-      # 3. Setup Wallet
-      # =========================
-      - name: Setup Wallet from Private Key
         run: |
-          mkdir -p ~/.sui
+          sudo apt-get update
+          sudo apt-get install -y curl git clang libssl-dev pkg-config
+          curl -fsSL https://install.sui.io | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-          sui keytool import "${{ secrets.SUI_PRIVATE_KEY }}" ed25519
+      # 3. Check Sui version
+      - name: Check Sui Version
+        run: sui --version
 
-          ADDRESS=$(sui keytool list | grep ed25519 | head -n 1 | awk '{print $2}')
-          echo "ADDRESS=$ADDRESS" >> $GITHUB_ENV
-
-          sui client switch --address $ADDRESS
-
-          echo "Using wallet: $ADDRESS"
-
-      # =========================
-      # 4. Set Testnet
-      # =========================
-      - name: Set Testnet RPC
+      # 4. Setup wallet (PRIVATE KEY dari secrets)
+      - name: Setup Sui Wallet
+        env:
+          SUI_PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
         run: |
-          sui client new-env --alias testnet \
-            --rpc https://fullnode.testnet.sui.io \
-            --ws wss://fullnode.testnet.sui.io/ws || true
+          sui client new-address ed25519
+          sui client import --private-key $SUI_PRIVATE_KEY
+          sui client switch --address $(sui client addresses | head -n 1)
+          sui client active-address
 
+      # 5. Switch ke testnet
+      - name: Switch to Testnet
+        run: |
           sui client switch --env testnet
+          sui client active-env
 
-      # =========================
-      # 5. Check Gas
-      # =========================
-      - name: Check Gas
-        run: |
-          sui client gas
+      # 6. Build contract
+      - name: Build Contract
+        run: sui move build
 
-      # =========================
-      # 6. Publish Contract
-      # =========================
+      # 7. Publish contract
       - name: Publish Contract
-        run: |
-          cd nft/testnet
-
-          sui client publish --gas-budget 100000000 > publish.log
-
-          echo "==== PUBLISH RESULT ===="
-          cat publish.log
-
-          PACKAGE_ID=$(grep -o '0x[a-f0-9]\{64\}' publish.log | head -n 1)
-
-          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
-
-          echo "Contract deployed at: $PACKAGE_ID"
+        run: sui client publish --gas-budget 100000000
