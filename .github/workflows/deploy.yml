@@ -9,42 +9,85 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # =========================
+      # 1. Checkout Repo
+      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # =========================
+      # 2. Install Sui CLI (FAST VERSION)
+      # =========================
       - name: Install Sui CLI
         run: |
-          curl -fsSL https://install.sui.io | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          curl -L https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64 -o sui
+          chmod +x sui
+          sudo mv sui /usr/local/bin/
           sui --version
 
+      # =========================
+      # 3. Setup Wallet
+      # =========================
       - name: Setup Wallet from Private Key
         run: |
           mkdir -p ~/.sui
 
-          # 🔥 Import private key ke Sui
           sui keytool import "${{ secrets.SUI_PRIVATE_KEY }}" ed25519
 
-          # 🔥 Ambil address pertama
-          ADDR=$(sui client addresses | head -n 1)
-          echo "Using address: $ADDR"
+          ADDR=$(sui keytool list | grep ed25519 | head -n 1 | awk '{print $2}')
+          echo "ADDRESS=$ADDR" >> $GITHUB_ENV
 
-          # 🔥 Set jadi active
           sui client switch --address $ADDR
 
+      # =========================
+      # 4. Set Testnet
+      # =========================
       - name: Set Testnet RPC
         run: |
           sui client new-env --alias testnet \
             --rpc https://fullnode.testnet.sui.io \
-            --ws https://fullnode.testnet.sui.io:443 || true
+            --ws wss://fullnode.testnet.sui.io/ws || true
 
           sui client switch --env testnet
 
+      # =========================
+      # 5. Check Gas
+      # =========================
       - name: Check Gas
         run: |
           sui client gas
 
+      # =========================
+      # 6. Publish Contract
+      # =========================
       - name: Publish Contract
         run: |
           cd nft/testnet
-          sui client publish --gas-budget 100000000
+          sui client publish --gas-budget 100000000 > publish.log
+
+          echo "==== RESULT ===="
+          cat publish.log
+
+          PACKAGE_ID=$(grep -o '0x[a-f0-9]\{64\}' publish.log | head -n 1)
+          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
+
+      # =========================
+      # 7. Mint 2700 NFT (LO MAU AUTO)
+      # =========================
+      - name: Mint All NFT (2700)
+        run: |
+          echo "Minting to: $ADDRESS"
+          echo "Package: $PACKAGE_ID"
+
+          for i in {1..2700}
+          do
+            echo "Mint #$i"
+
+            sui client call \
+              --package $PACKAGE_ID \
+              --module testnet_baby_suiduckz_nft \
+              --function mint \
+              --args $ADDRESS \
+              --gas-budget 10000000 || true
+
+          done
