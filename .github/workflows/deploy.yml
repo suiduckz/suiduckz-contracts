@@ -8,10 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout
       - uses: actions/checkout@v4
 
-      # 2. Install Sui CLI
       - name: Install Sui
         run: |
           sudo apt-get update
@@ -26,11 +24,9 @@ jobs:
 
           sui --version
 
-      # 3. Setup Testnet Config
-      - name: Setup Config
+      - name: Setup Config (TESTNET)
         run: |
           mkdir -p ~/.sui/sui_config
-
           echo "keystore:" > ~/.sui/sui_config/client.yaml
           echo "  File: /home/runner/.sui/sui_config/sui.keystore" >> ~/.sui/sui_config/client.yaml
           echo "envs:" >> ~/.sui/sui_config/client.yaml
@@ -38,7 +34,6 @@ jobs:
           echo "    rpc: https://fullnode.testnet.sui.io:443" >> ~/.sui/sui_config/client.yaml
           echo "active_env: testnet" >> ~/.sui/sui_config/client.yaml
 
-      # 4. Import Wallet (WAJIB suiprivkey)
       - name: Import Wallet
         env:
           PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
@@ -46,10 +41,11 @@ jobs:
           sui keytool import "$PRIVATE_KEY" ed25519
           sui client active-address
 
-      # 5. Faucet
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
+          echo "Faucet to $ADDR"
+
           for i in 1 2 3 4 5; do
             curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
@@ -57,18 +53,25 @@ jobs:
             sleep 5
           done
 
-      # 6. Build & Deploy
-      - name: Build & Deploy
+          echo "⏳ tunggu balance update..."
+          sleep 10
+
+      - name: Check Balance
+        run: |
+          sui client gas
+
+      - name: Build & Publish
         run: |
           cd nft/testnet
 
-          echo "🔨 BUILD..."
+          echo "🔨 BUILD"
           sui move build
 
-          echo "🚀 DEPLOY..."
-          RESULT=$(sui client publish --gas-budget 100000000)
+          echo "🚀 PUBLISH"
+          sui client publish --gas-budget 200000000 --json > result.json || cat result.json
 
-          echo "$RESULT"
+          echo "📦 RESULT:"
+          cat result.json
 
           echo "📦 PACKAGE ID:"
-          echo "$RESULT" | grep -o '0x[a-f0-9]\{64\}' | head -n 1
+          cat result.json | grep -o '0x[a-f0-9]\{64\}' | head -n 1
