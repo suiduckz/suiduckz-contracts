@@ -3,8 +3,8 @@ name = "baby_suiduckz_testnet"
 version = "0.0.1"
 edition = "2024"
 
+# Biarkan Sui auto-inject (hindari NOTE di log)
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "main" }
 
 [addresses]
 baby_suiduckz_testnet = "0x0"
