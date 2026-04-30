@@ -1,0 +1,78 @@
+name: Mint Baby Suiduckz NFT (Testnet)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Sui
+      - name: Install Sui
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+
+          curl -L https://github.com/MystenLabs/sui/releases/download/mainnet-v1.70.2/sui-mainnet-v1.70.2-ubuntu-x86_64.tgz -o sui.tgz
+          tar -xvf sui.tgz
+
+          SUI_BIN=$(find . -type f -name "sui" | head -n 1)
+          chmod +x $SUI_BIN
+          sudo mv $SUI_BIN /usr/local/bin/sui
+
+          sui --version
+
+      # Setup config
+      - name: Setup Config
+        run: |
+          mkdir -p ~/.sui/sui_config
+
+          echo "keystore:" > ~/.sui/sui_config/client.yaml
+          echo "  File: /home/runner/.sui/sui_config/sui.keystore" >> ~/.sui/sui_config/client.yaml
+          echo "envs:" >> ~/.sui/sui_config/client.yaml
+          echo "  - alias: testnet" >> ~/.sui/sui_config/client.yaml
+          echo "    rpc: https://fullnode.testnet.sui.io:443" >> ~/.sui/sui_config/client.yaml
+          echo "active_env: testnet" >> ~/.sui/sui_config/client.yaml
+
+      # Import wallet
+      - name: Import Wallet
+        env:
+          PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
+        run: |
+          sui keytool import "$PRIVATE_KEY" ed25519
+          echo "👤 Address:"
+          sui client active-address
+
+      # Faucet (biar ada gas)
+      - name: Faucet
+        run: |
+          ADDR=$(sui client active-address)
+
+          for i in 1 2 3 4 5; do
+            curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
+              -H "Content-Type: application/json" \
+              -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}"
+
+            echo "⏳ waiting..."
+            sleep 8
+          done
+
+      # 🔥 MINT NFT (PAKAI PACKAGE ID LO)
+      - name: Mint NFT
+        run: |
+          echo "🎨 Minting..."
+
+          sui client call \
+            --package 0x05432958b8a03ba52398ce23b2cd4be0639d3a662c30d0862c8f6af89b7d0ac1 \
+            --module nft \
+            --function mint \
+            --gas-budget 10000000
+
+      # Check hasil
+      - name: Check NFT
+        run: |
+          echo "📦 Objects:"
+          sui client objects
