@@ -8,22 +8,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # 1. Checkout
+      - uses: actions/checkout@v4
 
-      - name: Debug Structure
-        run: ls -R
-
+      # 2. Install Sui (AUTO DETECT FIX)
       - name: Install Sui
         run: |
           sudo apt-get update
           sudo apt-get install -y curl
+
           curl -L https://github.com/MystenLabs/sui/releases/download/mainnet-v1.70.2/sui-mainnet-v1.70.2-ubuntu-x86_64.tgz -o sui.tgz
           tar -xvf sui.tgz
-          sudo mv sui*/sui /usr/local/bin/sui
-          chmod +x /usr/local/bin/sui
+
+          echo "🔍 Cari binary sui..."
+          SUI_BIN=$(find . -type f -name "sui" | head -n 1)
+
+          echo "FOUND: $SUI_BIN"
+
+          if [ -z "$SUI_BIN" ]; then
+            echo "❌ Binary sui tidak ditemukan!"
+            exit 1
+          fi
+
+          chmod +x $SUI_BIN
+          sudo mv $SUI_BIN /usr/local/bin/sui
+
+          echo "✅ Sui installed:"
           sui --version
 
+      # 3. Setup config
       - name: Setup Config
         run: |
           mkdir -p ~/.sui/sui_config
@@ -34,6 +47,7 @@ jobs:
           echo "    rpc: https://fullnode.testnet.sui.io:443" >> ~/.sui/sui_config/client.yaml
           echo "active_env: testnet" >> ~/.sui/sui_config/client.yaml
 
+      # 4. Import wallet
       - name: Import Wallet
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
@@ -41,23 +55,25 @@ jobs:
           sui keytool import "$PRIVATE_KEY" ed25519
           sui client active-address
 
+      # 5. Faucet
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
-          for i in 1 2 3; do
-            curl -X POST https://faucet.testnet.sui.io/v2/gas \
+          for i in 1 2 3 4 5; do
+            curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
               -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
+            echo "Retry faucet..."
             sleep 5
           done
 
+      # 6. Build & Deploy (PATH FIX)
       - name: Build & Deploy
         run: |
           cd nft/testnet
+
+          echo "🔨 BUILD..."
           sui move build
+
+          echo "🚀 DEPLOY..."
           sui client publish --gas-budget 100000000
-      # 10. Output result
-      - name: Show Result
-        run: |
-          echo "🎉 DEPLOY SUCCESS!"
-          echo "Package ID: $PACKAGE_ID"
