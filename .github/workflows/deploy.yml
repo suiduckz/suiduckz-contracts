@@ -1,58 +1,67 @@
 name: Deploy Testnet Baby Suiduckz NFT
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # 1. Checkout
+      - uses: actions/checkout@v4
 
-      # 2. Install Sui CLI (FIX: pakai binary, bukan curl install.sui.io)
-      - name: Install Sui CLI
+      # 2. Install Sui CLI (STABLE)
+      - name: Install Sui
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl git clang libssl-dev pkg-config
+          curl -L https://github.com/MystenLabs/sui/releases/download/mainnet-v1.70.2/sui-mainnet-v1.70.2-ubuntu-x86_64.tgz -o sui.tgz
+          tar -xvf sui.tgz
+          sudo mv sui*/sui /usr/local/bin/sui
+          chmod +x /usr/local/bin/sui
+          sui --version
 
-          # Download binary Sui terbaru
-          curl -L https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64 -o sui
+      # 3. Setup config TESTNET
+      - name: Setup config
+        run: |
+          mkdir -p ~/.sui/sui_config
 
-          # Kasih permission
-          chmod +x sui
+          cat > ~/.sui/sui_config/client.yaml <<EOF
+keystore:
+  File: /home/runner/.sui/sui_config/sui.keystore
+envs:
+  - alias: testnet
+    rpc: https://fullnode.testnet.sui.io:443
+active_env: testnet
+EOF
 
-          # Pindahin ke PATH
-          sudo mv sui /usr/local/bin/sui
-
-      # 3. Check Sui version
-      - name: Check Sui Version
-        run: sui --version
-
-      # 4. Setup wallet
-      - name: Setup Sui Wallet
+      # 4. Import wallet
+      - name: Import wallet
         env:
-          SUI_PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: |
-          sui client new-address ed25519
-          sui client import --private-key $SUI_PRIVATE_KEY
-          sui client switch --address $(sui client addresses | head -n 1)
+          sui keytool import "$PRIVATE_KEY" ed25519
           sui client active-address
 
-      # 5. Switch ke testnet
-      - name: Switch to Testnet
+      # 5. Faucet TESTNET (FIX)
+      - name: Faucet
         run: |
-          sui client switch --env testnet
-          sui client active-env
+          ADDR=$(sui client active-address)
 
-      # 6. Build contract
-      - name: Build Contract
-        run: sui move build
+          for i in {1..3}; do
+            curl -X POST https://faucet.testnet.sui.io/v2/gas \
+              -H "Content-Type: application/json" \
+              -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
+            echo "Retry faucet..."
+            sleep 5
+          done
 
-      # 7. Publish contract
-      - name: Publish Contract
-        run: sui client publish --gas-budget 100000000
+      # 6. Build & Deploy NFT
+      - name: Build & Deploy
+        run: |
+          cd testnet   # pastikan folder lo bener
+
+          echo "🔨 BUILD NFT..."
+          sui move build
+
+          echo "🚀 DEPLOY NFT..."
+          sui client publish --gas-budget 100000000
