@@ -9,25 +9,32 @@ jobs:
 
     steps:
       # 1. Checkout
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2. Debug structure (WAJIB biar keliatan)
+      # 2. Debug structure (biar keliatan kalau error lagi)
       - name: Debug Structure
         run: |
-          echo "📂 LIST FILE:"
+          echo "📂 PROJECT STRUCTURE:"
           ls -R
 
-      # 3. Install Sui
-      - name: Install Sui
+      # 3. Install Sui CLI (STABLE)
+      - name: Install Sui CLI
         run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+
           curl -L https://github.com/MystenLabs/sui/releases/download/mainnet-v1.70.2/sui-mainnet-v1.70.2-ubuntu-x86_64.tgz -o sui.tgz
           tar -xvf sui.tgz
+
           sudo mv sui*/sui /usr/local/bin/sui
           chmod +x /usr/local/bin/sui
+
+          echo "✅ Sui Installed:"
           sui --version
 
-      # 4. Setup config
-      - name: Setup config
+      # 4. Setup config TESTNET
+      - name: Setup Sui Config
         run: |
           mkdir -p ~/.sui/sui_config
 
@@ -40,41 +47,65 @@ envs:
 active_env: testnet
 EOF
 
-      # 5. Import wallet
-      - name: Import wallet
+      # 5. Import Wallet
+      - name: Import Wallet
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: |
+          echo "🔑 Import wallet..."
           sui keytool import "$PRIVATE_KEY" ed25519
+
+          echo "👤 Active address:"
           sui client active-address
 
-      # 6. Faucet
-      - name: Faucet
+      # 6. Faucet (retry biar stabil)
+      - name: Request Faucet
         run: |
           ADDR=$(sui client active-address)
+          echo "💰 Request faucet for: $ADDR"
 
-          for i in {1..3}; do
-            curl -X POST https://faucet.testnet.sui.io/v2/gas \
+          for i in {1..5}; do
+            curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
               -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
+
+            echo "Retry faucet ($i)..."
             sleep 5
           done
 
-      # 7. Auto find Move.toml (INI KUNCI FIX)
-      - name: Find Move Project
-        id: find_move
+      # 7. Set WORKDIR FIX (INI YANG TADI ERROR)
+      - name: Set Project Path
         run: |
-          DIR=$(dirname $(find . -name Move.toml | head -n 1))
-          echo "dir=$DIR" >> $GITHUB_OUTPUT
-          echo "📦 Found Move project at: $DIR"
+          echo "📦 Moving to NFT project..."
+          cd nft/testnet || (echo "❌ Folder nft/testnet tidak ditemukan" && exit 1)
 
-      # 8. Build & Deploy
-      - name: Build & Deploy NFT
+      # 8. Build
+      - name: Build Contract
         run: |
-          cd ${{ steps.find_move.outputs.dir }}
+          cd nft/testnet
 
-          echo "🔨 BUILD..."
+          echo "🔨 BUILD START..."
           sui move build
 
-          echo "🚀 DEPLOY..."
-          sui client publish --gas-budget 100000000
+      # 9. Publish + Capture Package ID
+      - name: Publish Contract
+        run: |
+          cd nft/testnet
+
+          echo "🚀 DEPLOYING TO TESTNET..."
+
+          OUTPUT=$(sui client publish --gas-budget 100000000)
+
+          echo "$OUTPUT"
+
+          PACKAGE_ID=$(echo "$OUTPUT" | grep -o '0x[a-f0-9]\{64\}' | head -n 1)
+
+          echo "📦 PACKAGE ID: $PACKAGE_ID"
+
+          echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
+
+      # 10. Output result
+      - name: Show Result
+        run: |
+          echo "🎉 DEPLOY SUCCESS!"
+          echo "Package ID: $PACKAGE_ID"
