@@ -14,19 +14,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Install dependencies (Sui CLI)
+      # 2. Install Sui CLI (FIX: pakai binary, bukan curl install.sui.io)
       - name: Install Sui CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y curl git clang libssl-dev pkg-config
-          curl -fsSL https://install.sui.io | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+          # Download binary Sui terbaru
+          curl -L https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64 -o sui
+
+          # Kasih permission
+          chmod +x sui
+
+          # Pindahin ke PATH
+          sudo mv sui /usr/local/bin/sui
 
       # 3. Check Sui version
       - name: Check Sui Version
         run: sui --version
 
-      # 4. Setup wallet (PRIVATE KEY dari secrets)
+      # 4. Setup wallet
       - name: Setup Sui Wallet
         env:
           SUI_PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
