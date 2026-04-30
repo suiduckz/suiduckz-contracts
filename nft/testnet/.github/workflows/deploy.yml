@@ -1,0 +1,50 @@
+name: Deploy Testnet Baby Suiduckz NFT
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Sui CLI
+        run: |
+          curl -fsSL https://install.sui.io | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          sui --version
+
+      - name: Setup Wallet from Private Key
+        run: |
+          mkdir -p ~/.sui
+
+          # 🔥 Import private key ke Sui
+          sui keytool import "${{ secrets.SUI_PRIVATE_KEY }}" ed25519
+
+          # 🔥 Ambil address pertama
+          ADDR=$(sui client addresses | head -n 1)
+          echo "Using address: $ADDR"
+
+          # 🔥 Set jadi active
+          sui client switch --address $ADDR
+
+      - name: Set Testnet RPC
+        run: |
+          sui client new-env --alias testnet \
+            --rpc https://fullnode.testnet.sui.io \
+            --ws https://fullnode.testnet.sui.io:443 || true
+
+          sui client switch --env testnet
+
+      - name: Check Gas
+        run: |
+          sui client gas
+
+      - name: Publish Contract
+        run: |
+          cd nft/testnet
+          sui client publish --gas-budget 100000000
