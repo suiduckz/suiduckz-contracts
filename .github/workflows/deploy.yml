@@ -11,7 +11,13 @@ jobs:
       # 1. Checkout
       - uses: actions/checkout@v4
 
-      # 2. Install Sui CLI (STABLE)
+      # 2. Debug structure (WAJIB biar keliatan)
+      - name: Debug Structure
+        run: |
+          echo "📂 LIST FILE:"
+          ls -R
+
+      # 3. Install Sui
       - name: Install Sui
         run: |
           curl -L https://github.com/MystenLabs/sui/releases/download/mainnet-v1.70.2/sui-mainnet-v1.70.2-ubuntu-x86_64.tgz -o sui.tgz
@@ -20,7 +26,7 @@ jobs:
           chmod +x /usr/local/bin/sui
           sui --version
 
-      # 3. Setup config TESTNET
+      # 4. Setup config
       - name: Setup config
         run: |
           mkdir -p ~/.sui/sui_config
@@ -34,7 +40,7 @@ envs:
 active_env: testnet
 EOF
 
-      # 4. Import wallet
+      # 5. Import wallet
       - name: Import wallet
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
@@ -42,7 +48,7 @@ EOF
           sui keytool import "$PRIVATE_KEY" ed25519
           sui client active-address
 
-      # 5. Faucet TESTNET (FIX)
+      # 6. Faucet
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
@@ -51,17 +57,24 @@ EOF
             curl -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
               -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
-            echo "Retry faucet..."
             sleep 5
           done
 
-      # 6. Build & Deploy NFT
-      - name: Build & Deploy
+      # 7. Auto find Move.toml (INI KUNCI FIX)
+      - name: Find Move Project
+        id: find_move
         run: |
-          cd testnet   # pastikan folder lo bener
+          DIR=$(dirname $(find . -name Move.toml | head -n 1))
+          echo "dir=$DIR" >> $GITHUB_OUTPUT
+          echo "📦 Found Move project at: $DIR"
 
-          echo "🔨 BUILD NFT..."
+      # 8. Build & Deploy
+      - name: Build & Deploy NFT
+        run: |
+          cd ${{ steps.find_move.outputs.dir }}
+
+          echo "🔨 BUILD..."
           sui move build
 
-          echo "🚀 DEPLOY NFT..."
+          echo "🚀 DEPLOY..."
           sui client publish --gas-budget 100000000
