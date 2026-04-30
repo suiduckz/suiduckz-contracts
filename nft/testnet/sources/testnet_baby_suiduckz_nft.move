@@ -1,18 +1,16 @@
 module baby_suiduckz_testnet::nft {
 
-    use sui::object::{UID, new};
-    use sui::tx_context::{TxContext, sender};
-    use sui::transfer;
-
+    // pakai fully-qualified, jadi gak ada duplicate alias warning
     public struct BabySuiDuckz has key, store {
-        id: UID,
+        id: sui::object::UID,
     }
 
-    public entry fun mint(ctx: &mut TxContext) {
+    // gak perlu `entry` kalau sudah `public`
+    public fun mint(ctx: &mut sui::tx_context::TxContext) {
         let nft = BabySuiDuckz {
-            id: new(ctx),
+            id: sui::object::new(ctx),
         };
 
-        transfer::transfer(nft, sender(ctx));
+        sui::transfer::transfer(nft, sui::tx_context::sender(ctx));
     }
 }
