@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Sui CLI
+      # Install Sui
       - name: Install Sui
         run: |
           sudo apt-get update
@@ -60,16 +60,16 @@ jobs:
             sleep 8
           done
 
-      # 🔥 MINT NFT (PAKAI DATA LO)
+      # 🔥 MINT NFT (FINAL)
       - name: Mint NFT
         run: |
-          echo "🎨 Minting NFT..."
+          echo "🎨 Minting..."
 
           sui client call \
-            --package 0x2b9dec43acee502129377986162c28664a83ecb4d70a861aa1a175e584aabc23 \
+            --package 0xcffb7808f7e79bfcf2619ea69be3e3af6d64d3510b3c9f494ef79a197d47d41d \
             --module nft \
             --function mint \
-            --args 0x01b495edad6ea29507bc3f9a3708f869ce91dff17b513883b90448771d57a2ba \
+            --args 0xdd319c84ed66d10f1ceba90334f9f9638b6af2ae450b79a85a7743413239c536 \
             --gas-budget 10000000
 
       # Check result
