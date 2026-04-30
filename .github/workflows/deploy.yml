@@ -9,9 +9,10 @@ jobs:
 
     steps:
       # 1. Checkout
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # 2. Install Sui
+      # 2. Install Sui CLI
       - name: Install Sui
         run: |
           sudo apt-get update
@@ -26,10 +27,11 @@ jobs:
 
           sui --version
 
-      # 3. Setup Config
+      # 3. Setup Sui config (TESTNET)
       - name: Setup Config
         run: |
           mkdir -p ~/.sui/sui_config
+
           echo "keystore:" > ~/.sui/sui_config/client.yaml
           echo "  File: /home/runner/.sui/sui_config/sui.keystore" >> ~/.sui/sui_config/client.yaml
           echo "envs:" >> ~/.sui/sui_config/client.yaml
@@ -37,39 +39,32 @@ jobs:
           echo "    rpc: https://fullnode.testnet.sui.io:443" >> ~/.sui/sui_config/client.yaml
           echo "active_env: testnet" >> ~/.sui/sui_config/client.yaml
 
-      # 4. FIX PRIVATE KEY (AUTO CONVERT)
+      # 4. Import Wallet (FINAL FIX)
       - name: Import Wallet
         env:
           PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
         run: |
-          echo "🔑 Convert private key..."
-
-          # convert HEX → suiprivkey
-          sui keytool convert $PRIVATE_KEY > key.txt
-
-          FIXED_KEY=$(grep "suiprivkey" key.txt | awk '{print $NF}')
-
-          echo "✅ Converted key"
-
-          sui keytool import "$FIXED_KEY" ed25519
-
+          echo "🔑 Import wallet..."
+          sui keytool import "$PRIVATE_KEY" ed25519
           echo "👤 Address:"
           sui client active-address
 
-      # 5. Faucet
+      # 5. Faucet (biar ada gas)
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
+          echo "💰 Faucet ke: $ADDR"
 
           for i in 1 2 3 4 5; do
             curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
               -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
+            echo "Retry faucet..."
             sleep 5
           done
 
-      # 6. Build & Deploy
-      - name: Build & Deploy
+      # 6. Build + Deploy
+      - name: Build & Deploy NFT
         run: |
           cd nft/testnet
 
@@ -77,4 +72,9 @@ jobs:
           sui move build
 
           echo "🚀 DEPLOY..."
-          sui client publish --gas-budget 100000000
+          RESULT=$(sui client publish --gas-budget 100000000)
+
+          echo "$RESULT"
+
+          echo "📦 PACKAGE ID:"
+          echo "$RESULT" | grep -o '0x[a-f0-9]\{64\}' | head -n 1
