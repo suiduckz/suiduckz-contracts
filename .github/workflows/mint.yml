@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Sui
+      # Install Sui CLI
       - name: Install Sui
         run: |
           sudo apt-get update
@@ -46,7 +46,7 @@ jobs:
           echo "👤 Address:"
           sui client active-address
 
-      # Faucet (biar ada gas)
+      # Faucet
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
@@ -60,19 +60,20 @@ jobs:
             sleep 8
           done
 
-      # 🔥 MINT NFT (PAKAI PACKAGE ID LO)
+      # 🔥 MINT NFT (PAKAI DATA LO)
       - name: Mint NFT
         run: |
-          echo "🎨 Minting..."
+          echo "🎨 Minting NFT..."
 
           sui client call \
-            --package 0x05432958b8a03ba52398ce23b2cd4be0639d3a662c30d0862c8f6af89b7d0ac1 \
+            --package 0x2b9dec43acee502129377986162c28664a83ecb4d70a861aa1a175e584aabc23 \
             --module nft \
             --function mint \
+            --args 0x01b495edad6ea29507bc3f9a3708f869ce91dff17b513883b90448771d57a2ba \
             --gas-budget 10000000
 
-      # Check hasil
-      - name: Check NFT
+      # Check result
+      - name: Check Objects
         run: |
-          echo "📦 Objects:"
+          echo "📦 Your NFTs:"
           sui client objects
