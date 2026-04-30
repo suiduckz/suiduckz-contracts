@@ -9,8 +9,7 @@ jobs:
 
     steps:
       # 1. Checkout
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       # 2. Install Sui CLI
       - name: Install Sui
@@ -27,7 +26,7 @@ jobs:
 
           sui --version
 
-      # 3. Setup Sui config (TESTNET)
+      # 3. Setup Testnet Config
       - name: Setup Config
         run: |
           mkdir -p ~/.sui/sui_config
@@ -39,32 +38,27 @@ jobs:
           echo "    rpc: https://fullnode.testnet.sui.io:443" >> ~/.sui/sui_config/client.yaml
           echo "active_env: testnet" >> ~/.sui/sui_config/client.yaml
 
-      # 4. Import Wallet (FINAL FIX)
+      # 4. Import Wallet (WAJIB suiprivkey)
       - name: Import Wallet
         env:
           PRIVATE_KEY: ${{ secrets.SUI_PRIVATE_KEY }}
         run: |
-          echo "🔑 Import wallet..."
           sui keytool import "$PRIVATE_KEY" ed25519
-          echo "👤 Address:"
           sui client active-address
 
-      # 5. Faucet (biar ada gas)
+      # 5. Faucet
       - name: Faucet
         run: |
           ADDR=$(sui client active-address)
-          echo "💰 Faucet ke: $ADDR"
-
           for i in 1 2 3 4 5; do
             curl -s -X POST https://faucet.testnet.sui.io/v2/gas \
               -H "Content-Type: application/json" \
               -d "{\"FixedAmountRequest\":{\"recipient\":\"$ADDR\"}}" && break
-            echo "Retry faucet..."
             sleep 5
           done
 
-      # 6. Build + Deploy
-      - name: Build & Deploy NFT
+      # 6. Build & Deploy
+      - name: Build & Deploy
         run: |
           cd nft/testnet
 
