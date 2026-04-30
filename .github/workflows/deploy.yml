@@ -10,19 +10,26 @@ jobs:
 
     steps:
       # =========================
-      # 1. Checkout Repo
+      # 1. Checkout
       # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
       # =========================
-      # 2. Install Sui CLI (FAST VERSION)
+      # 2. Install Sui CLI (Stable)
       # =========================
       - name: Install Sui CLI
         run: |
-          curl -L https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64 -o sui
+          sudo apt-get update
+          sudo apt-get install -y wget file
+
+          wget -O sui https://github.com/MystenLabs/sui/releases/latest/download/sui-ubuntu-x86_64
+
+          file sui
+
           chmod +x sui
-          sudo mv sui /usr/local/bin/
+          sudo mv sui /usr/local/bin/sui
+
           sui --version
 
       # =========================
@@ -34,10 +41,12 @@ jobs:
 
           sui keytool import "${{ secrets.SUI_PRIVATE_KEY }}" ed25519
 
-          ADDR=$(sui keytool list | grep ed25519 | head -n 1 | awk '{print $2}')
-          echo "ADDRESS=$ADDR" >> $GITHUB_ENV
+          ADDRESS=$(sui keytool list | grep ed25519 | head -n 1 | awk '{print $2}')
+          echo "ADDRESS=$ADDRESS" >> $GITHUB_ENV
 
-          sui client switch --address $ADDR
+          sui client switch --address $ADDRESS
+
+          echo "Using wallet: $ADDRESS"
 
       # =========================
       # 4. Set Testnet
@@ -63,31 +72,14 @@ jobs:
       - name: Publish Contract
         run: |
           cd nft/testnet
+
           sui client publish --gas-budget 100000000 > publish.log
 
-          echo "==== RESULT ===="
+          echo "==== PUBLISH RESULT ===="
           cat publish.log
 
           PACKAGE_ID=$(grep -o '0x[a-f0-9]\{64\}' publish.log | head -n 1)
+
           echo "PACKAGE_ID=$PACKAGE_ID" >> $GITHUB_ENV
 
-      # =========================
-      # 7. Mint 2700 NFT (LO MAU AUTO)
-      # =========================
-      - name: Mint All NFT (2700)
-        run: |
-          echo "Minting to: $ADDRESS"
-          echo "Package: $PACKAGE_ID"
-
-          for i in {1..2700}
-          do
-            echo "Mint #$i"
-
-            sui client call \
-              --package $PACKAGE_ID \
-              --module testnet_baby_suiduckz_nft \
-              --function mint \
-              --args $ADDRESS \
-              --gas-budget 10000000 || true
-
-          done
+          echo "Contract deployed at: $PACKAGE_ID"
