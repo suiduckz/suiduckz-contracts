@@ -1,0 +1,8 @@
+name = "suiduckz-mint"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "suiduckz-mint-db"
+database_id = "94f0ff18-155d-4843-87c2-45c2a9c52acf"
